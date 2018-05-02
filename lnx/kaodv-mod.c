@@ -566,17 +566,17 @@ static int __init kaodv_init(void)
 
 	ret = nf_register_hook(&kaodv_ops[0]);
 
-	if (ret < 0){
+	if (ret < 0)
 		goto cleanup_netlink;
 
 	ret = nf_register_hook(&kaodv_ops[1]);
 
-	if (ret < 0){
+	if (ret < 0)
 		goto cleanup_hook0;
 
 	ret = nf_register_hook(&kaodv_ops[2]);
 
-	if (ret < 0){
+	if (ret < 0)
 		goto cleanup_hook1;
 
 
