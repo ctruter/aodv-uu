@@ -37,7 +37,11 @@
 #define EXPL_MAX_LEN 1024
 
 static unsigned int expl_len;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
 static rwlock_t expl_lock = RW_LOCK_UNLOCKED;
+#else
+static rwlock_t expl_lock = __RW_LOCK_UNLOCKED(expl_lock);
+#endif
 static LIST_HEAD(expl_head);
 
 #define list_is_first(e) (&e->l == expl_head.next)
@@ -136,6 +140,7 @@ static inline int __kaodv_expl_add(struct expl_entry *e)
 
 static inline struct expl_entry *__kaodv_expl_find(__u32 daddr)
 {
+
 	struct list_head *pos;
 
 	list_for_each(pos, &expl_head) {
@@ -409,9 +414,10 @@ void kaodv_expl_init(void)
 {
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 	proc_net_create("kaodv_expl", 0, kaodv_expl_proc_info);
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
+    create_proc_read_entry("kaodv_expl", 0, init_net.proc_net, kaodv_expl_proc_info, NULL);
 #else
-	create_proc_read_entry("kaodv_expl", 0, 
-			       init_net.proc_net, kaodv_expl_proc_info, NULL);
+    proc_create_data("kaodv_expl", 0, init_net.proc_net,(struct file_operations*) kaodv_expl_proc_info, NULL);
 #endif
 
 	expl_len = 0;
@@ -425,7 +431,9 @@ void kaodv_expl_fini(void)
 	kaodv_expl_flush();
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 	proc_net_remove("kaodv_expl");
-#else
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
 	proc_net_remove(&init_net, "kaodv_expl");
+#else
+    remove_proc_entry("kaodv_expl",init_net.proc_net);
 #endif
 }

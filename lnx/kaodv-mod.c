@@ -124,6 +124,7 @@ void kaodv_update_route_timeouts(int hooknum, const struct net_device *dev,
 	}
 }
 
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(3,12,74))
 static unsigned int kaodv_hook(unsigned int hooknum,
 			       struct sk_buff *skb,
 			       const struct net_device *in,
@@ -240,6 +241,36 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 			return NF_STOLEN;
 
 		} else if (e.flags & KAODV_RT_GW_ENCAP) {
+#ifdef ENABLE_DISABLED
+			/* Make sure the maximum segment size (MSM) is
+			   reduced to account for the
+			   encapsulation. This is probably not the
+			   nicest way to do it. It works sometimes,
+			   but may freeze due to some locking issue
+			   that needs to be fix... */
+			if (iph->protocol == IPPROTO_TCP) {
+				
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
+				if ((*skb)->sk) {
+					struct tcp_sock *tp = tcp_sk((*skb)->sk);
+					if (tp->mss_cache > 1452) {
+						tp->rx_opt.user_mss = 1452;
+						tp->rx_opt.mss_clamp = 1452;
+						tcp_sync_mss((*skb)->sk, 1452);
+					}
+				}
+#else
+				if (skb->sk) {
+					struct tcp_sock *tp = tcp_sk(skb->sk);
+					if (tp->mss_cache > 1452) {
+						tp->rx_opt.user_mss = 1452;
+						tp->rx_opt.mss_clamp = 1452;
+						tcp_sync_mss(skb->sk, 1452);
+					}
+				}
+#endif
+			}
+#endif /* ENABLE_DISABLED */
 			/* Make sure that also the virtual Internet
 			 * dest entry is refreshed */
 			kaodv_update_route_timeouts(hooknum, out, iph);
@@ -257,6 +288,174 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 	}
 	return NF_ACCEPT;
 }
+#else
+static unsigned int kaodv_hook(const struct nf_hook_ops *ops,
+			       struct sk_buff *skb,
+			       const struct net_device *in,
+			       const struct net_device *out,
+			       int (*okfn) (struct sk_buff *))
+{
+
+	struct iphdr *iph = SKB_NETWORK_HDR_IPH(skb);
+	struct expl_entry e;
+	struct in_addr ifaddr, bcaddr;
+	int res = 0;
+	unsigned int hooknum = ops->hooknum;
+
+	memset(&ifaddr, 0, sizeof(struct in_addr));
+	memset(&bcaddr, 0, sizeof(struct in_addr));
+
+	/* We are only interested in IP packets */
+	if (iph == NULL)
+		return NF_ACCEPT;
+	
+	/* We want AODV control messages to go through directly to the
+	 * AODV socket.... */
+	if (iph && iph->protocol == IPPROTO_UDP) {
+		struct udphdr *udph;
+
+		udph = (struct udphdr *)((char *)iph + (iph->ihl << 2));
+
+		if (ntohs(udph->dest) == AODV_PORT ||
+		    ntohs(udph->source) == AODV_PORT) {
+
+#ifdef CONFIG_QUAL_THRESHOLD
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+			qual = (int)(skb)->__unused;
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
+			qual = (skb)->iwq.qual;
+#endif
+			if (qual_th && hooknum == NF_INET_PRE_ROUTING) {
+
+				if (qual && qual < qual_th) {
+					pkts_dropped++;
+					return NF_DROP;
+				}
+			}
+#endif /* CONFIG_QUAL_THRESHOLD */
+			if (hooknum == NF_INET_PRE_ROUTING && in)
+				kaodv_update_route_timeouts(hooknum, in, iph);
+
+			return NF_ACCEPT;
+		}
+	}
+	
+	if (hooknum == NF_INET_PRE_ROUTING)
+		res = if_info_from_ifindex(&ifaddr, &bcaddr, in->ifindex);
+	else 
+		res = if_info_from_ifindex(&ifaddr, &bcaddr, out->ifindex);
+	
+	if (res < 0)
+		return NF_ACCEPT;
+	
+
+	/* Ignore broadcast and multicast packets */
+	if (iph->daddr == INADDR_BROADCAST ||
+	    IN_MULTICAST(ntohl(iph->daddr)) || 
+	    iph->daddr == bcaddr.s_addr)
+		return NF_ACCEPT;
+
+       
+	/* Check which hook the packet is on... */
+	switch (hooknum) {
+	case NF_INET_PRE_ROUTING:
+		kaodv_update_route_timeouts(hooknum, in, iph);
+		
+		/* If we are a gateway maybe we need to decapsulate? */
+		if (is_gateway && iph->protocol == IPPROTO_MIPE &&
+		    iph->daddr == ifaddr.s_addr) {
+			ip_pkt_decapsulate(skb);
+			iph = SKB_NETWORK_HDR_IPH(skb);
+			return NF_ACCEPT;
+		}
+		/* Ignore packets generated locally or that are for this
+		 * node. */
+		if (iph->saddr == ifaddr.s_addr ||
+		    iph->daddr == ifaddr.s_addr) {
+			return NF_ACCEPT;
+		}
+		/* Check for unsolicited data packets */
+		else if (!kaodv_expl_get(iph->daddr, &e)) {
+			kaodv_netlink_send_rerr_msg(PKT_INBOUND, iph->saddr,
+						    iph->daddr, in->ifindex);
+			return NF_DROP;
+
+		}
+		/* Check if we should repair the route */
+		else if (e.flags & KAODV_RT_REPAIR) {
+
+			kaodv_netlink_send_rt_msg(KAODVM_REPAIR, iph->saddr,
+						  iph->daddr);
+
+			kaodv_queue_enqueue_packet(skb, okfn);
+
+			return NF_STOLEN;
+		}
+		break;
+	case NF_INET_LOCAL_OUT:
+
+		if (!kaodv_expl_get(iph->daddr, &e) ||
+		    (e.flags & KAODV_RT_REPAIR)) {
+
+			if (!kaodv_queue_find(iph->daddr))
+				kaodv_netlink_send_rt_msg(KAODVM_ROUTE_REQ,
+							  0,
+							  iph->daddr);
+			
+			kaodv_queue_enqueue_packet(skb, okfn);
+			
+			return NF_STOLEN;
+
+		} else if (e.flags & KAODV_RT_GW_ENCAP) {
+#ifdef ENABLE_DISABLED
+			/* Make sure the maximum segment size (MSM) is
+			   reduced to account for the
+			   encapsulation. This is probably not the
+			   nicest way to do it. It works sometimes,
+			   but may freeze due to some locking issue
+			   that needs to be fix... */
+			if (iph->protocol == IPPROTO_TCP) {
+				
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
+				if ((*skb)->sk) {
+					struct tcp_sock *tp = tcp_sk((*skb)->sk);
+					if (tp->mss_cache > 1452) {
+						tp->rx_opt.user_mss = 1452;
+						tp->rx_opt.mss_clamp = 1452;
+						tcp_sync_mss((*skb)->sk, 1452);
+					}
+				}
+#else
+				if (skb->sk) {
+					struct tcp_sock *tp = tcp_sk(skb->sk);
+					if (tp->mss_cache > 1452) {
+						tp->rx_opt.user_mss = 1452;
+						tp->rx_opt.mss_clamp = 1452;
+						tcp_sync_mss(skb->sk, 1452);
+					}
+				}
+#endif
+			}
+#endif /* ENABLE_DISABLED */
+			/* Make sure that also the virtual Internet
+			 * dest entry is refreshed */
+			kaodv_update_route_timeouts(hooknum, out, iph);
+			
+			skb = ip_pkt_encapsulate(skb, e.nhop);
+			
+			if (!skb)
+				return NF_STOLEN;
+
+			ip_route_me_harder(skb, RTN_LOCAL);
+		}
+		break;
+	case NF_INET_POST_ROUTING:
+		kaodv_update_route_timeouts(hooknum, out, iph);
+	}
+	return NF_ACCEPT;
+}
+#endif
+
 
 int kaodv_proc_info(char *buffer, char **start, off_t offset, int length)
 {
@@ -363,21 +562,23 @@ static int __init kaodv_init(void)
 
 	if (ret < 0)
 		goto cleanup_queue;
+	
 
 	ret = nf_register_hook(&kaodv_ops[0]);
 
-	if (ret < 0)
+	if (ret < 0){
 		goto cleanup_netlink;
 
 	ret = nf_register_hook(&kaodv_ops[1]);
 
-	if (ret < 0)
+	if (ret < 0){
 		goto cleanup_hook0;
 
 	ret = nf_register_hook(&kaodv_ops[2]);
 
-	if (ret < 0)
+	if (ret < 0){
 		goto cleanup_hook1;
+
 
 	/* Prefetch network device info (ip, broadcast address, ifindex). */
 	for (i = 0; i < MAX_INTERFACES; i++) {
@@ -398,9 +599,12 @@ static int __init kaodv_init(void)
 	
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 	proc_net_create("kaodv", 0, kaodv_proc_info);
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)) 
+    if (!create_proc_read_entry("kaodv", 0, init_net.proc_net, kaodv_read_proc, NULL))
+                            
 #else
-    if (!create_proc_read_entry("kaodv", 0, init_net.proc_net, kaodv_read_proc,
-                            NULL))
+    if (!proc_create_data("kaodv", 0, init_net.proc_net,(struct file_operations*) kaodv_read_proc, NULL))
+                            
         KAODV_DEBUG("Could not create kaodv proc entry");
 #endif
 	KAODV_DEBUG("Module init OK");
@@ -432,8 +636,10 @@ static void __exit kaodv_exit(void)
 		nf_unregister_hook(&kaodv_ops[i]);
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 	proc_net_remove("kaodv");
-#else
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
 	proc_net_remove(&init_net, "kaodv");
+#else
+    remove_proc_entry("kaodv", init_net.proc_net);
 #endif
 	kaodv_queue_fini();
 	kaodv_expl_fini();

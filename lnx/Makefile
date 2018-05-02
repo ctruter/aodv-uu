@@ -1,4 +1,4 @@
-ifneq (,$(findstring 2.6,$(KERNELRELEASE)))
+ifneq (,$(KERNELRELEASE))
 EXTRA_CFLAGS += -D KERNEL26 $(XDEFS)
 obj-m += kaodv.o
 kaodv-objs := kaodv-mod.o kaodv-debug.o kaodv-netlink.o kaodv-queue.o kaodv-ipenc.o kaodv-expl.o 
@@ -33,14 +33,14 @@ KCFLAGS_MIPS=-Wall -mips2 -O2 -fno-pic -mno-abicalls -mlong-calls -G0 -msoft-flo
 
 .PHONY: clean clean-2.4 clean-2.6 indent default
 
-# Check for kernel version
-ifeq ($(PATCHLEVEL),6)
-default: kaodv.ko
-clean: clean-2.6
-else 
-# Assume kernel 2.4
+# If kernel 2.4
+ifneq (,$(findstring 2.4,$(KERNELRELEASE)))
 default: kaodv.o
 clean: clean-2.4
+else 
+# Assume kernel 2.6 or higher
+default: kaodv.ko
+clean: clean-2.6
 endif
 
 #default: kaodv.ko

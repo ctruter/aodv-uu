@@ -48,6 +48,7 @@
 #define NET_KAODV_QUEUE_QMAX 2088
 #define NET_KAODV_QUEUE_QMAX_NAME "kaodv_queue_maxlen"
 
+
 struct kaodv_rt_info {
 	__u8 tos;
 	__u32 daddr;
@@ -64,7 +65,11 @@ struct kaodv_queue_entry {
 typedef int (*kaodv_queue_cmpfn) (struct kaodv_queue_entry *, unsigned long);
 
 static unsigned int queue_maxlen = KAODV_QUEUE_QMAX_DEFAULT;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
 static rwlock_t queue_lock = RW_LOCK_UNLOCKED;
+#else
+static rwlock_t queue_lock = __RW_LOCK_UNLOCKED(queue_lock);
+#endif
 static unsigned int queue_total;
 static LIST_HEAD(queue_list);
 
@@ -322,14 +327,15 @@ static int init_or_cleanup(int init)
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 	proc = proc_net_create(KAODV_QUEUE_PROC_FS_NAME, 0, kaodv_queue_get_info);
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
+    proc = create_proc_read_entry(KAODV_QUEUE_PROC_FS_NAME, 0, init_net.proc_net, kaodv_queue_get_info, NULL);   
 #else
-	proc = create_proc_read_entry(KAODV_QUEUE_PROC_FS_NAME, 0, init_net.proc_net, kaodv_queue_get_info, NULL);
+	proc = proc_create_data(KAODV_QUEUE_PROC_FS_NAME, 0, init_net.proc_net,(struct file_operations*)kaodv_queue_get_info, NULL);
 #endif
 	if (!proc) {
 	  printk(KERN_ERR "kaodv_queue: failed to create proc entry\n");
 	  return -1;
 	}
-
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30))
 	proc->owner = THIS_MODULE;
 #endif
@@ -344,15 +350,16 @@ static int init_or_cleanup(int init)
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 	proc_net_remove(KAODV_QUEUE_PROC_FS_NAME);
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
+    proc_net_remove(&init_net, KAODV_QUEUE_PROC_FS_NAME);
 #else
-	proc_net_remove(&init_net, KAODV_QUEUE_PROC_FS_NAME);
+    remove_proc_entry(KAODV_QUEUE_PROC_FS_NAME,init_net.proc_net);
 #endif
 	return status;
 }
 
 int kaodv_queue_init(void)
 {
-
 	return init_or_cleanup(1);
 }
 
