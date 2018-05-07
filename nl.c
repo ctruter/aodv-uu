@@ -182,6 +182,7 @@ static void nl_kaodv_callback(int sock)
 	nlm = (struct nlmsghdr *) buf;
 
 	switch (nlm->nlmsg_type) {
+	DEBUG(LOG_DEBUG, 0, "Got NLMSG: nlmsg_type -> %d", nlm->nlmsg_type);
 	case NLMSG_ERROR:
 		nlmerr = NLMSG_DATA(nlm);
 		if (nlmerr->error == 0) {
@@ -425,6 +426,9 @@ int nl_send(struct nlsock *nl, struct nlmsghdr *n)
 
 	/* Request an acknowledgement by setting NLM_F_ACK */
 	n->nlmsg_flags |= NLM_F_ACK;
+	
+	/* DEBUG(LOG_DEBUG, 0, "nlmsg_len: %d, nlmsg_type: %d, nlmsg_flags: %d, nlmsg_seq: %d, nlmsg_pid: %d",
+	      n->nlmsg_len, n->nlmsg_type, n->nlmsg_flags, n->nlmsg_seq, n->nlmsg_pid);*/
 
 	/* Send message to netlink interface. */
 	res = sendmsg(nl->sock, &msg, 0);

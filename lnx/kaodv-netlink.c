@@ -313,19 +313,14 @@ static inline void kaodv_netlink_rcv_skb(struct sk_buff *skb)
 	/* if (type < NLMSG_NOOP || type >= IPQM_MAX) */
 /* 		RCV_SKB_FAIL(-EINVAL); */
 #ifdef KERNEL26
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18))
+	#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18))
 	if (security_netlink_recv(skb))
 		RCV_SKB_FAIL(-EPERM);
-#else
-	if(capable(CAP_NET_ADMIN))
-	{
-	    RCV_SKB_FAIL(-EPERM);
-	}
-	if(cap_raised(current_cap(),CAP_NET_ADMIN))
-	{
-	    RCV_SKB_FAIL(-EPERM);
-	}
-#endif
+	#else
+	// TODO: Account for other kernel versions. This is for kernel versions 3.2 and greater
+	if(!netlink_capable(skb, CAP_NET_ADMIN))
+		RCV_SKB_FAIL(-EPERM);
+	#endif
 #endif
 	//write_lock_bh(&queue_lock);
 	
