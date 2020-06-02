@@ -191,7 +191,6 @@ static int kaodv_netlink_receive_peer(unsigned char type, void *msg,
 	int ret = 0;
 	struct kaodv_rt_msg *m;
 	struct kaodv_conf_msg *cm;
-	struct expl_entry e;
 
 	/*KAODV_DEBUG("Received msg: %s", kaodv_msg_type_to_str(type));*/
 
@@ -202,9 +201,9 @@ static int kaodv_netlink_receive_peer(unsigned char type, void *msg,
 
 		m = (struct kaodv_rt_msg *)msg;
 
-		ret = kaodv_expl_get(m->dst, &e);
+		ret = kaodv_expl_get(m->dst, NULL);
 
-		if (ret < 0) {
+		if (ret > 0) {
 			ret = kaodv_expl_update(m->dst, m->nhop, m->time,
 						m->flags, m->ifindex);
 		} else {
