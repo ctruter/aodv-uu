@@ -197,7 +197,7 @@ int kaodv_expl_del(__u32 daddr)
 	if (res) {
 		kfree(e);
 	}
-      unlock:
+unlock:
 	write_unlock_bh(&expl_lock);
 
 	return res;
@@ -208,7 +208,7 @@ int kaodv_expl_get(__u32 daddr, struct expl_entry *e_in)
 	struct expl_entry *e;
 	int res = 0;
 
-/*     printk("Checking activeness\n"); */
+	/* printk("Checking activeness\n"); */
 	read_lock_bh(&expl_lock);
 	e = __kaodv_expl_find(daddr);
 
@@ -390,7 +390,7 @@ int kaodv_expl_update(__u32 daddr, __u32 nhop, unsigned long time,
 	__kaodv_expl_set_next_timeout();
 #endif
 
-      unlock:
+unlock:
 	write_unlock_bh(&expl_lock);
 
 	return ret;
@@ -415,9 +415,9 @@ void kaodv_expl_init(void)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 	proc_net_create("kaodv_expl", 0, kaodv_expl_proc_info);
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
-    create_proc_read_entry("kaodv_expl", 0, init_net.proc_net, kaodv_expl_proc_info, NULL);
+	create_proc_read_entry("kaodv_expl", 0, init_net.proc_net, kaodv_expl_proc_info, NULL);
 #else
-    proc_create_data("kaodv_expl", 0, init_net.proc_net,(struct file_operations*) kaodv_expl_proc_info, NULL);
+	proc_create_data("kaodv_expl", 0, init_net.proc_net,(struct file_operations*) kaodv_expl_proc_info, NULL);
 #endif
 
 	expl_len = 0;
@@ -434,6 +434,6 @@ void kaodv_expl_fini(void)
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
 	proc_net_remove(&init_net, "kaodv_expl");
 #else
-    remove_proc_entry("kaodv_expl",init_net.proc_net);
+	remove_proc_entry("kaodv_expl",init_net.proc_net);
 #endif
 }

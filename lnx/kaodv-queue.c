@@ -184,7 +184,7 @@ kaodv_queue_enqueue_packet(struct sk_buff *skb, int (*okfn) (struct sk_buff *))
 	write_unlock_bh(&queue_lock);
 	return status;
 
-      err_out_unlock:
+err_out_unlock:
 	write_unlock_bh(&queue_lock);
 	kfree(entry);
 
@@ -328,21 +328,21 @@ static int init_or_cleanup(int init)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 	proc = proc_net_create(KAODV_QUEUE_PROC_FS_NAME, 0, kaodv_queue_get_info);
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
-    proc = create_proc_read_entry(KAODV_QUEUE_PROC_FS_NAME, 0, init_net.proc_net, kaodv_queue_get_info, NULL);   
+	proc = create_proc_read_entry(KAODV_QUEUE_PROC_FS_NAME, 0, init_net.proc_net, kaodv_queue_get_info, NULL);
 #else
 	proc = proc_create_data(KAODV_QUEUE_PROC_FS_NAME, 0, init_net.proc_net,(struct file_operations*)kaodv_queue_get_info, NULL);
 #endif
 	if (!proc) {
-	  printk(KERN_ERR "kaodv_queue: failed to create proc entry\n");
-	  return -1;
+		printk(KERN_ERR "kaodv_queue: failed to create proc entry\n");
+		return -1;
 	}
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30))
 	proc->owner = THIS_MODULE;
 #endif
 
 	return 1;
-	
- cleanup:
+
+cleanup:
 #ifdef KERNEL26
 	synchronize_net();
 #endif
@@ -351,9 +351,9 @@ static int init_or_cleanup(int init)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 	proc_net_remove(KAODV_QUEUE_PROC_FS_NAME);
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
-    proc_net_remove(&init_net, KAODV_QUEUE_PROC_FS_NAME);
+	proc_net_remove(&init_net, KAODV_QUEUE_PROC_FS_NAME);
 #else
-    remove_proc_entry(KAODV_QUEUE_PROC_FS_NAME,init_net.proc_net);
+	remove_proc_entry(KAODV_QUEUE_PROC_FS_NAME,init_net.proc_net);
 #endif
 	return status;
 }

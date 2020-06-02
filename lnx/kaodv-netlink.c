@@ -94,7 +94,7 @@ static struct sk_buff *kaodv_netlink_build_msg(int type, void *data, int len)
 	
 	return skb;
 
-      nlmsg_failure:
+nlmsg_failure:
 	if (skb)
 		kfree_skb(skb);
 
@@ -249,7 +249,7 @@ static int kaodv_netlink_rcv_nl_event(struct notifier_block *this,
 				      unsigned long event, void *ptr)
 {
 	struct netlink_notify *n = ptr;
-	
+
 	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0))
 	if (event == NETLINK_URELEASE && n->protocol == NETLINK_AODV && n->portid) {
 		if (n->portid == peer_pid) {
@@ -269,7 +269,7 @@ static int kaodv_netlink_rcv_nl_event(struct notifier_block *this,
 		return NOTIFY_DONE;
 	}
 	#endif
-	
+
 	return NOTIFY_DONE;
 }
 
@@ -292,7 +292,7 @@ static inline void kaodv_netlink_rcv_skb(struct sk_buff *skb)
 
 	nlh = (struct nlmsghdr *)skb->data;
 	nlmsglen = nlh->nlmsg_len;
-	
+
 	if (nlmsglen < sizeof(struct nlmsghdr) || skblen < nlmsglen) {
 		printk("nlsmsg=%d skblen=%d to small\n", nlmsglen, skblen);
 		return;
@@ -303,7 +303,6 @@ static inline void kaodv_netlink_rcv_skb(struct sk_buff *skb)
 
 	if (pid <= 0 || !(flags & NLM_F_REQUEST) || flags & NLM_F_MULTI)
 		RCV_SKB_FAIL(-EINVAL);
-
 
 	if (flags & MSG_TRUNC)
 		RCV_SKB_FAIL(-ECOMM);
@@ -323,7 +322,7 @@ static inline void kaodv_netlink_rcv_skb(struct sk_buff *skb)
 	#endif
 #endif
 	//write_lock_bh(&queue_lock);
-	
+
 	if (peer_pid) {
 		if (peer_pid != pid) {
 			//write_unlock_bh(&queue_lock);
@@ -368,23 +367,23 @@ static void kaodv_netlink_rcv_sk(struct sock *sk, int len)
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0))
 struct netlink_kernel_cfg cfg = {
-    .input = kaodv_netlink_rcv_skb,
+	.input = kaodv_netlink_rcv_skb,
 };
 #endif
 
 int kaodv_netlink_init(void)
 {
-    netlink_register_notifier(&kaodv_nl_notifier);
+	netlink_register_notifier(&kaodv_nl_notifier);
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14))
-    kaodvnl = netlink_kernel_create(NETLINK_AODV, kaodv_netlink_rcv_sk);
+	kaodvnl = netlink_kernel_create(NETLINK_AODV, kaodv_netlink_rcv_sk);
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22))
-    kaodvnl = netlink_kernel_create(NETLINK_AODV, AODVGRP_MAX, kaodv_netlink_rcv_sk, THIS_MODULE);
+	kaodvnl = netlink_kernel_create(NETLINK_AODV, AODVGRP_MAX, kaodv_netlink_rcv_sk, THIS_MODULE);
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
-    kaodvnl = netlink_kernel_create(NETLINK_AODV, AODVGRP_MAX, kaodv_netlink_rcv_sk, NULL, THIS_MODULE);
+	kaodvnl = netlink_kernel_create(NETLINK_AODV, AODVGRP_MAX, kaodv_netlink_rcv_sk, NULL, THIS_MODULE);
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,6,0))
-    kaodvnl = netlink_kernel_create(&init_net, NETLINK_AODV, AODVGRP_MAX, kaodv_netlink_rcv_skb, NULL, THIS_MODULE);
+	kaodvnl = netlink_kernel_create(&init_net, NETLINK_AODV, AODVGRP_MAX, kaodv_netlink_rcv_skb, NULL, THIS_MODULE);
 #else
-    kaodvnl = netlink_kernel_create(&init_net, NETLINK_AODV,&cfg);
+	kaodvnl = netlink_kernel_create(&init_net, NETLINK_AODV,&cfg);
 #endif
 
 	if (kaodvnl == NULL) {
@@ -392,6 +391,7 @@ int kaodv_netlink_init(void)
 		netlink_unregister_notifier(&kaodv_nl_notifier);
 		return -1;
 	}
+
 	return 0;
 }
 

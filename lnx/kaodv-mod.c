@@ -173,15 +173,14 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 			return NF_ACCEPT;
 		}
 	}
-	
+
 	if (hooknum == NF_INET_PRE_ROUTING)
 		res = if_info_from_ifindex(&ifaddr, &bcaddr, in->ifindex);
 	else 
 		res = if_info_from_ifindex(&ifaddr, &bcaddr, out->ifindex);
-	
+
 	if (res < 0)
 		return NF_ACCEPT;
-	
 
 	/* Ignore broadcast and multicast packets */
 	if (iph->daddr == INADDR_BROADCAST ||
@@ -189,12 +188,11 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 	    iph->daddr == bcaddr.s_addr)
 		return NF_ACCEPT;
 
-       
 	/* Check which hook the packet is on... */
 	switch (hooknum) {
 	case NF_INET_PRE_ROUTING:
 		kaodv_update_route_timeouts(hooknum, in, iph);
-		
+
 		/* If we are a gateway maybe we need to decapsulate? */
 		if (is_gateway && iph->protocol == IPPROTO_MIPE &&
 		    iph->daddr == ifaddr.s_addr) {
@@ -235,7 +233,7 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 				kaodv_netlink_send_rt_msg(KAODVM_ROUTE_REQ,
 							  0,
 							  iph->daddr);
-			
+
 			kaodv_queue_enqueue_packet(skb, okfn);
 			
 			return NF_STOLEN;
@@ -249,7 +247,7 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 			   but may freeze due to some locking issue
 			   that needs to be fix... */
 			if (iph->protocol == IPPROTO_TCP) {
-				
+
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 				if ((*skb)->sk) {
 					struct tcp_sock *tp = tcp_sk((*skb)->sk);
@@ -295,7 +293,6 @@ static unsigned int kaodv_hook(const struct nf_hook_ops *ops,
 			       const struct net_device *out,
 			       int (*okfn) (struct sk_buff *))
 {
-
 	struct iphdr *iph = SKB_NETWORK_HDR_IPH(skb);
 	struct expl_entry e;
 	struct in_addr ifaddr, bcaddr;
@@ -308,7 +305,7 @@ static unsigned int kaodv_hook(const struct nf_hook_ops *ops,
 	/* We are only interested in IP packets */
 	if (iph == NULL)
 		return NF_ACCEPT;
-	
+
 	/* We want AODV control messages to go through directly to the
 	 * AODV socket.... */
 	if (iph && iph->protocol == IPPROTO_UDP) {
@@ -344,10 +341,9 @@ static unsigned int kaodv_hook(const struct nf_hook_ops *ops,
 		res = if_info_from_ifindex(&ifaddr, &bcaddr, in->ifindex);
 	else 
 		res = if_info_from_ifindex(&ifaddr, &bcaddr, out->ifindex);
-	
+
 	if (res < 0)
 		return NF_ACCEPT;
-	
 
 	/* Ignore broadcast and multicast packets */
 	if (iph->daddr == INADDR_BROADCAST ||
@@ -355,12 +351,11 @@ static unsigned int kaodv_hook(const struct nf_hook_ops *ops,
 	    iph->daddr == bcaddr.s_addr)
 		return NF_ACCEPT;
 
-       
 	/* Check which hook the packet is on... */
 	switch (hooknum) {
 	case NF_INET_PRE_ROUTING:
 		kaodv_update_route_timeouts(hooknum, in, iph);
-		
+
 		/* If we are a gateway maybe we need to decapsulate? */
 		if (is_gateway && iph->protocol == IPPROTO_MIPE &&
 		    iph->daddr == ifaddr.s_addr) {
@@ -401,7 +396,7 @@ static unsigned int kaodv_hook(const struct nf_hook_ops *ops,
 				kaodv_netlink_send_rt_msg(KAODVM_ROUTE_REQ,
 							  0,
 							  iph->daddr);
-			
+
 			kaodv_queue_enqueue_packet(skb, okfn);
 			
 			return NF_STOLEN;
@@ -440,9 +435,9 @@ static unsigned int kaodv_hook(const struct nf_hook_ops *ops,
 			/* Make sure that also the virtual Internet
 			 * dest entry is refreshed */
 			kaodv_update_route_timeouts(hooknum, out, iph);
-			
+
 			skb = ip_pkt_encapsulate(skb, e.nhop);
-			
+
 			if (!skb)
 				return NF_STOLEN;
 
@@ -461,8 +456,7 @@ int kaodv_proc_info(char *buffer, char **start, off_t offset, int length)
 {
 	int len;
 
-	len =
-	    sprintf(buffer,
+	len = sprintf(buffer,
 		    "qual threshold=%d\npkts dropped=%lu\nlast qual=%d\ngateway_mode=%d\n",
 		    qual_th, pkts_dropped, qual, is_gateway);
 
@@ -526,21 +520,20 @@ static struct nf_hook_ops kaodv_ops[] = {
 static int kaodv_read_proc(char *page, char **start, off_t off, int count,
                     int *eof, void *data)
 {
-    int len;
+	int len;
 
-    len = sprintf(page,
-        "qual threshold=%d\npkts dropped=%lu\nlast qual=%d\ngateway_mode=%d\n",
-        qual_th, pkts_dropped, qual, is_gateway);
+	len = sprintf(page,
+		"qual threshold=%d\npkts dropped=%lu\nlast qual=%d\ngateway_mode=%d\n",
+		qual_th, pkts_dropped, qual, is_gateway);
 
-    *start = page + off;
-    len -= off;
-    if (len > count)
-        len = count;
-    else if (len < 0)
-        len = 0;
-    return len;
+	*start = page + off;
+	len -= off;
+	if (len > count)
+		len = count;
+	else if (len < 0)
+		len = 0;
+	return len;
 }
-
 
 static int __init kaodv_init(void)
 {
@@ -562,7 +555,6 @@ static int __init kaodv_init(void)
 
 	if (ret < 0)
 		goto cleanup_queue;
-	
 
 	ret = nf_register_hook(&kaodv_ops[0]);
 
@@ -579,7 +571,6 @@ static int __init kaodv_init(void)
 	if (ret < 0)
 		goto cleanup_hook1;
 
-
 	/* Prefetch network device info (ip, broadcast address, ifindex). */
 	for (i = 0; i < MAX_INTERFACES; i++) {
 		if (!ifname[i])
@@ -588,24 +579,21 @@ static int __init kaodv_init(void)
 		dev = dev_get_by_name(&init_net, ifname[i]);
 
 		if (!dev) {
-			printk("No device %s available, ignoring!\n",
-			       ifname[i]);
+			printk("No device %s available, ignoring!\n", ifname[i]);
 			continue;
 		}
 		if_info_add(dev);
 
 		dev_put(dev);
 	}
-	
+
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 	proc_net_create("kaodv", 0, kaodv_proc_info);
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)) 
-    if (!create_proc_read_entry("kaodv", 0, init_net.proc_net, kaodv_read_proc, NULL))
-                            
+	if (!create_proc_read_entry("kaodv", 0, init_net.proc_net, kaodv_read_proc, NULL))
 #else
-    if (!proc_create_data("kaodv", 0, init_net.proc_net,(struct file_operations*) kaodv_read_proc, NULL))
-                            
-        KAODV_DEBUG("Could not create kaodv proc entry");
+	if (!proc_create_data("kaodv", 0, init_net.proc_net,(struct file_operations*) kaodv_read_proc, NULL))
+		KAODV_DEBUG("Could not create kaodv proc entry");
 #endif
 	KAODV_DEBUG("Module init OK");
 
@@ -629,7 +617,7 @@ cleanup_queue:
 static void __exit kaodv_exit(void)
 {
 	unsigned int i;
-	
+
 	if_info_purge();
 
 	for (i = 0; i < sizeof(kaodv_ops) / sizeof(struct nf_hook_ops); i++)
@@ -639,7 +627,7 @@ static void __exit kaodv_exit(void)
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
 	proc_net_remove(&init_net, "kaodv");
 #else
-    remove_proc_entry("kaodv", init_net.proc_net);
+	remove_proc_entry("kaodv", init_net.proc_net);
 #endif
 	kaodv_queue_fini();
 	kaodv_expl_fini();
