@@ -181,8 +181,8 @@ static void nl_kaodv_callback(int sock)
 
 	nlm = (struct nlmsghdr *) buf;
 
-	switch (nlm->nlmsg_type) {
 	DEBUG(LOG_DEBUG, 0, "Got NLMSG: nlmsg_type -> %d", nlm->nlmsg_type);
+	switch (nlm->nlmsg_type) {
 	case NLMSG_ERROR:
 		nlmerr = NLMSG_DATA(nlm);
 		if (nlmerr->error == 0) {
